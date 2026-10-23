@@ -12,10 +12,64 @@
     body {
       margin: 0;
       overflow: hidden;
-      background-color: #000;
+      background-color: #0b0c10;
       font-family: sans-serif;
     }
 
+    /* СТИЛЬНОЕ СТАРТОВОЕ ОКНО ЗАПРОСА ДОСТУПА */
+    #ar-start-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #0d0f18;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      transition: opacity 0.5s ease;
+    }
+
+    .start-title {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: bold;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+      text-align: center;
+    }
+
+    .start-desc {
+      color: #a0aec0;
+      font-size: 14px;
+      margin-bottom: 30px;
+      text-align: center;
+      max-width: 280px;
+      line-height: 1.5;
+    }
+
+    /* Кнопка, которая принудительно дергает вызов камеры */
+    #start-ar-btn {
+      background: linear-gradient(135deg, #45f3ff, #00a8ff);
+      color: #000;
+      border: none;
+      padding: 16px 36px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 0 20px rgba(69, 243, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      transition: transform 0.2s;
+    }
+    #start-ar-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Информационная плашка во время работы AR */
     #ar-info {
       position: fixed;
       top: 20px;
@@ -32,22 +86,21 @@
       z-index: 999;
       text-align: center;
       pointer-events: none;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      display: none; /* Покажется только после старта */
     }
 
-    /* Холст, который привяжется к плакату */
+    /* Холст анимации над плакатом */
     .ar-poster-canvas {
       position: absolute;
       display: none;
       background: transparent;
       box-sizing: border-box;
     }
-
     .ar-poster-canvas.target-tracked {
       display: block;
     }
 
-    /* Точка 5 (Ядро) */
+    /* Центральная Точка 5 (Ядро) */
     .transformation-core {
       position: absolute;
       top: 50%;
@@ -110,7 +163,7 @@
       100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
     }
 
-    /* Фикс видео для Хрома на Android */
+    /* Растягиваем видео с камеры */
     video {
       position: absolute;
       top: 0;
@@ -124,10 +177,19 @@
 </head>
 <body>
 
-  <div id="ar-info">Запуск камеры... Подождите</div>
+  <!-- Стартовый экран-заглушка -->
+  <div id="ar-start-screen">
+    <div class="start-title">Лаборатория AR</div>
+    <div class="start-desc">Для демонстрации гидролиза крахмала приложению необходим доступ к камере смартфона.</div>
+    <button id="start-ar-btn">Включить AR-камеру</button>
+  </div>
+
+  <!-- Панель статуса -->
+  <div id="ar-info">Запуск камеры...</div>
 
   <div id="ar-container"></div>
 
+  <!-- Плакат, привязанный к координатам -->
   <div id="paintar-target" class="ar-poster-canvas">
     <div class="starch-particle st1"></div>
     <div class="starch-particle st2"></div>
@@ -142,52 +204,65 @@
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", async () => {
+    document.addEventListener("DOMContentLoaded", () => {
+      const startScreen = document.querySelector("#ar-start-screen");
+      const startBtn = document.querySelector("#start-ar-btn");
       const infoBox = document.querySelector("#ar-info");
       const arCanvas = document.querySelector("#paintar-target");
 
-      try {
-        const mindarThree = new window.MINDAR.IMAGE.MindARImage({
-          container: document.querySelector("#ar-container"),
-          imageTargetSrc: "targets.mind"
-        });
+      // Функция инициализации и принудительного старта камеры по клику
+      const initAR = async () => {
+        // Убираем стартовый экран
+        startScreen.style.opacity = "0";
+        setTimeout(() => startScreen.style.display = "none", 500);
+        infoBox.style.display = "block";
 
-        const anchor = mindarThree.addAnchor(0);
+        try {
+          const mindarThree = new window.MINDAR.IMAGE.MindARImage({
+            container: document.querySelector("#ar-container"),
+            imageTargetSrc: "targets.mind"
+          });
 
-        anchor.onTargetFound = () => {
-          infoBox.innerText = "АР Плакат Ожил ✨";
-          infoBox.style.borderColor = "#ffd700";
-          infoBox.style.color = "#ffd700";
-          arCanvas.classList.add("target-tracked");
-        };
+          const anchor = mindarThree.addAnchor(0);
 
-        anchor.onTargetReleased = () => {
+          anchor.onTargetFound = () => {
+            infoBox.innerText = "АР Плакат Ожил ✨";
+            infoBox.style.borderColor = "#ffd700";
+            infoBox.style.color = "#ffd700";
+            arCanvas.classList.add("target-tracked");
+          };
+
+          anchor.onTargetReleased = () => {
+            infoBox.innerText = "Наведите камеру на плакат";
+            infoBox.style.borderColor = "#45f3ff";
+            infoBox.style.color = "#45f3ff";
+            arCanvas.classList.remove("target-tracked");
+          };
+
+          anchor.onTargetUpdate = (matrix) => {
+            const projection = mindarThree.getProjectionMatrix();
+            const width = mindarThree.imageTargets.width;
+            const height = mindarThree.imageTargets.height;
+            
+            arCanvas.style.width = width + "px";
+            arCanvas.style.height = height + "px";
+            mindarThree.updateCSSObject(arCanvas, matrix, projection);
+          };
+
+          // Сама команда браузеру на включение объектива
+          await mindarThree.start();
           infoBox.innerText = "Наведите камеру на плакат";
-          infoBox.style.borderColor = "#45f3ff";
-          infoBox.style.color = "#45f3ff";
-          arCanvas.classList.remove("target-tracked");
-        };
 
-        anchor.onTargetUpdate = (matrix) => {
-          const projection = mindarThree.getProjectionMatrix();
-          const width = mindarThree.imageTargets.width;
-          const height = mindarThree.imageTargets.height;
-          
-          arCanvas.style.width = width + "px";
-          arCanvas.style.height = height + "px";
-          mindarThree.updateCSSObject(arCanvas, matrix, projection);
-        };
+        } catch (err) {
+          console.error(err);
+          infoBox.innerText = "Камера заблокирована в настройках";
+          infoBox.style.borderColor = "#ff4545";
+          infoBox.style.color = "#ff4545";
+        }
+      };
 
-        // Запуск AR
-        await mindarThree.start();
-        infoBox.innerText = "Наведите камеру на плакат";
-
-      } catch (err) {
-        console.error(err);
-        infoBox.innerText = "Ошибка доступа к камере";
-        infoBox.style.borderColor = "#ff4545";
-        infoBox.style.color = "#ff4545";
-      }
+      // Привязываем старт к физическому нажатию на кнопку
+      startBtn.addEventListener("click", initAR);
     });
   </script>
 
