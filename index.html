@@ -3,9 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>AR Лаборатория: Гидролиз крахмала</title>
+  <title>AR Лаборатория: Гидролиз</title>
+  
+  <!-- Подключаем только легкую и стабильную библиотеку распознавания картинок -->
+  <script src="https://jsdelivr.net"></script>
+
   <style>
-    /* Базовые настройки экрана */
     body, html {
       margin: 0;
       padding: 0;
@@ -16,7 +19,7 @@
       font-family: sans-serif;
     }
 
-    /* СВЕРХЛЕГКИЙ СТАРТОВЫЙ ЭКРАН */
+    /* Стартовый экран с кнопкой (чтобы гарантированно завелась камера) */
     #start-screen {
       position: fixed;
       top: 0;
@@ -29,6 +32,7 @@
       justify-content: center;
       align-items: center;
       z-index: 9999;
+      transition: opacity 0.4s ease;
     }
 
     .btn-start {
@@ -45,32 +49,48 @@
       box-shadow: 0 0 25px rgba(0, 242, 254, 0.4);
     }
 
-    /* ОКНО КАМЕРЫ (Стандартный HTML5 поток) */
-    #webcam-video {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      z-index: 1;
+    /* Информационная плашка-подсказка */
+    #ar-info {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(11, 12, 16, 0.85);
+      border: 1px solid #45f3ff;
+      padding: 12px 24px;
+      border-radius: 20px;
+      color: #45f3ff;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      z-index: 999;
+      text-align: center;
+      pointer-events: none;
+      display: none;
     }
 
-    /* ИНТЕРАКТИВНЫЙ ХОЛСТ С АНИМАЦИЕЙ (Привязан к пропорциям вашего плаката) */
-    .ar-overlay-canvas {
+    /* Контейнер для вывода видеопотока камерой */
+    #ar-container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ХОЛСТ АНИМАЦИИ (Будет привязан к углам и габаритам плаката в камере) */
+    .ar-poster-canvas {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 90vw;
-      max-width: 600px;
-      aspect-ratio: 4 / 3;
-      z-index: 10;
+      display: none; /* Появится только когда камера увидит плакат */
+      background: transparent;
       pointer-events: none;
       box-sizing: border-box;
+      transform-origin: 0 0; /* Важно для корректного 3D-трекинга */
     }
 
-    /* ПОДСВЕТКА ЦЕНТРАЛЬНОЙ ТОЧКИ 5 (ЯДРО РЕАКЦИИ) */
+    /* Класс включается автоматически, когда плакат найден */
+    .ar-poster-canvas.target-tracked {
+      display: block;
+    }
+
+    /* ТРАНСФОРМАЦИЯ В ТОЧКЕ 5 (ЦЕНТР) */
     .transformation-core {
       position: absolute;
       top: 50%;
@@ -82,9 +102,10 @@
       transform: translate(-50%, -50%);
       box-shadow: 0 0 35px #ffd700, 0 0 10px #fff;
       animation: pulseCore 1s ease-in-out infinite alternate;
+      z-index: 5;
     }
 
-    /* ЧАСТИЦЫ КРАХМАЛА (Движение по координатам вашей сетки: Точка 8 → Точка 5) */
+    /* Крахмал: Точка 8 (94%) → Точка 5 (50%) */
     .starch-particle {
       position: absolute;
       top: 50%;
@@ -94,7 +115,7 @@
       animation: flowStarch 2s linear infinite;
     }
 
-    /* КАПЛИ СИРОПА (Движение по координатам вашей сетки: Точка 5 → Точка 2) */
+    /* Сироп: Точка 5 (50%) → Точка 2 (6%) */
     .syrup-drop {
       position: absolute;
       top: 50%;
@@ -104,7 +125,7 @@
       animation: flowSyrup 2.2s linear infinite;
     }
 
-    /* Создаем непрерывность за счет задержек анимации */
+    /* Задержки частиц */
     .st1 { animation-delay: 0.0s; margin-top: -5px; width: 10px; height: 10px; }
     .st2 { animation-delay: 0.4s; margin-top: 5px;  width: 7px;  height: 7px; }
     .st3 { animation-delay: 0.8s; margin-top: -12px;width: 9px;  height: 9px; }
@@ -114,9 +135,6 @@
     .sy2 { animation-delay: 0.8s; margin-top: 4px;  width: 14px; height: 9px; }
     .sy3 { animation-delay: 1.4s; margin-top: -14px;width: 24px; height: 15px; }
 
-    /* ================= ТРАЕКТОРИИ ДВИЖЕНИЯ ПО ТОЧКАМ СЕТКИ ================= */
-    
-    /* Крахмал: от правого края (Точка 8 = 94%) строго в центр (Точка 5 = 50%) */
     @keyframes flowStarch {
       0% { left: 94%; opacity: 0; transform: translate(0, -50%) scale(0.6); }
       15% { opacity: 1; }
@@ -124,7 +142,6 @@
       100% { left: 50%; opacity: 0.2; transform: translate(0, -50%) scale(1.1); }
     }
 
-    /* Сироп: от центра (Точка 5 = 50%) строго к левому краю (Точка 2 = 6%) */
     @keyframes flowSyrup {
       0% { left: 50%; opacity: 0; transform: translate(0, -50%) scale(0.8); }
       15% { opacity: 1; transform: translate(0, -50%) scale(1.1); }
@@ -136,64 +153,100 @@
       0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
       100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
     }
+
+    /* Стилизация слоя камеры */
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: 1;
+    }
+    #ar-container {
+      position: relative;
+      z-index: 2;
+    }
   </style>
 </head>
 <body>
 
-  <!-- Стартовый экран для активации медиа-потока пользователем -->
   <div id="start-screen">
     <button class="btn-start" id="btn-activate">Открыть AR Камеру</button>
   </div>
 
-  <!-- Стандартный видеоплеер для камеры телефона -->
-  <video id="webcam-video" autoplay playsinline muted></video>
+  <div id="ar-info">Инициализация AR...</div>
 
-  <!-- Слой анимации, наложенный поверх камеры телефона -->
-  <div class="ar-overlay-canvas">
-    
-    <!-- Поток Крахмала: Из 8 в 5 -->
-    <div class="starch-particle st1"></div>
-    <div class="starch-particle st2"></div>
-    <div class="starch-particle st3"></div>
-    <div class="starch-particle st4"></div>
+  <div id="ar-container">
+    <!-- Холст, который привяжется к реальному плакату -->
+    <div id="paintar-target" class="ar-poster-canvas">
+      <div class="starch-particle st1"></div>
+      <div class="starch-particle st2"></div>
+      <div class="starch-particle st3"></div>
+      <div class="starch-particle st4"></div>
 
-    <!-- Ядро гидролиза в точке 5 -->
-    <div class="transformation-core"></div>
+      <div class="transformation-core"></div>
 
-    <!-- Поток Сиропа: Из 5 в 2 -->
-    <div class="syrup-drop sy1"></div>
-    <div class="syrup-drop sy2"></div>
-    <div class="syrup-drop sy3"></div>
-
+      <div class="syrup-drop sy1"></div>
+      <div class="syrup-drop sy2"></div>
+      <div class="syrup-drop sy3"></div>
+    </div>
   </div>
 
   <script>
     document.getElementById('btn-activate').addEventListener('click', async () => {
       const startScreen = document.getElementById('start-screen');
-      const videoElement = document.getElementById('webcam-video');
+      const infoBox = document.getElementById('ar-info');
+      const arCanvas = document.getElementById('paintar-target');
+
+      // Плавно скрываем кнопку
+      startScreen.style.opacity = '0';
+      setTimeout(() => startScreen.style.display = 'none', 400);
+      infoBox.style.display = 'block';
 
       try {
-        // Нативный вызов задней камеры смартфона (без сторонних библиотек)
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: "environment" } }, // Запрашиваем основную (заднюю) камеру
-          audio: false
+        // Запуск AR-движка и привязка к вашему файлу targets.mind
+        const mindarThree = new window.MINDAR.IMAGE.MindARImage({
+          container: document.querySelector("#ar-container"),
+          imageTargetSrc: "targets.mind" // Файл должен лежать в той же папке на GitHub
         });
-        
-        videoElement.srcObject = stream;
-        startScreen.style.display = 'none'; // Скрываем кнопку запуска
-        
+
+        const anchor = mindarThree.addAnchor(0);
+
+        anchor.onTargetFound = () => {
+          infoBox.innerText = "АР Плакат Ожил ✨";
+          infoBox.style.borderColor = "#ffd700";
+          infoBox.style.color = "#ffd700";
+          arCanvas.classList.add("target-tracked");
+        };
+
+        anchor.onTargetReleased = () => {
+          infoBox.innerText = "Наведите камеру на плакат";
+          infoBox.style.borderColor = "#45f3ff";
+          infoBox.style.color = "#45f3ff";
+          arCanvas.classList.remove("target-tracked");
+        };
+
+        // Самая важная часть: привязка CSS-координат анимации к физическому плакату в кадре
+        anchor.onTargetUpdate = (matrix) => {
+          const projection = mindarThree.getProjectionMatrix();
+          const width = mindarThree.imageTargets[0].width;
+          const height = mindarThree.imageTargets[0].height;
+          
+          arCanvas.style.width = width + "px";
+          arCanvas.style.height = height + "px";
+          
+          // Метод MindAR автоматически масштабирует и наклоняет наш HTML-холст вслед за бумагой
+          mindarThree.updateCSSObject(arCanvas, matrix, projection);
+        };
+
+        await mindarThree.start();
+        infoBox.innerText = "Наведите камеру на плакат";
+
       } catch (err) {
-        // Запасной вариант, если на ПК или некоторых AndroidfacingMode environment выдает ошибку
-        try {
-          const fallbackStream = await navigator.mediaDevices.getUserMedia({
-            video: true,
-            audio: false
-          });
-          videoElement.srcObject = fallbackStream;
-          startScreen.style.display = 'none';
-        } catch (finalErr) {
-          alert('Ошибка доступа: Пожалуйста, разрешите Хрому доступ к камере в настройках телефона.');
-        }
+        console.error(err);
+        alert('Ошибка инициализации AR. Проверьте файл targets.mind.');
       }
     });
   </script>
