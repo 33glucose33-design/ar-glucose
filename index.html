@@ -5,54 +5,210 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Быстрый AR: Крахмал в Сироп</title>
   
-  <!-- Сверхбыстрые и легкие библиотеки AR без зависаний -->
-  <script src="https://yastatic.net"></script>
-  <script src="https://cloudflare.com"></script>
+  <!-- Подключаем только ультралегкий трекер картинок (без тяжелой 3D графики) -->
+  <script src="https://jsdelivr.net"></script>
+
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000;
+      font-family: sans-serif;
+    }
+
+    /* Подсказка для пользователя */
+    #ar-info-panel {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(11, 12, 16, 0.85);
+      border: 1px solid #00f2fe;
+      padding: 12px 24px;
+      border-radius: 20px;
+      color: #00f2fe;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      z-index: 999;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    /* Контейнер видеопотока веб-камеры */
+    #ar-container {
+      width: 100vw;
+      height: 100vh;
+    }
+
+    /* ХОЛСТ АНИМАЦИИ (Прилипнет к углам вашего плаката в камере) */
+    .ar-poster-canvas {
+      position: absolute;
+      display: none; /* Скрыт, пока камера не найдет плакат */
+      background: transparent;
+      pointer-events: none;
+      box-sizing: border-box;
+      transform-origin: 0 0;
+    }
+
+    /* Активируется автоматически, когда плакат в фокусе */
+    .ar-poster-canvas.target-tracked {
+      display: block;
+    }
+
+    /* ЦЕНТРАЛЬНАЯ ТОЧКА 5 (ЯДРО РЕАКЦИИ) */
+    .transformation-core {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 40px;
+      height: 40px;
+      background: radial-gradient(circle, #ffffff 10%, #ffd700 70%);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 35px #ffd700, 0 0 10px #fff;
+      animation: pulseCore 1s ease-in-out infinite alternate;
+      z-index: 5;
+    }
+
+    /* КРАХМАЛ: Точка 8 (94%) → Точка 5 (50%) */
+    .starch-particle {
+      position: absolute;
+      top: 50%;
+      background: #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 0 10px #ffffff;
+      animation: flowStarch 2s linear infinite;
+    }
+
+    /* СИРОП: Точка 5 (50%) → Точка 2 (6%) */
+    .syrup-drop {
+      position: absolute;
+      top: 50%;
+      background: linear-gradient(to left, #ffd700, #ff8c00);
+      border-radius: 50% 15% 15% 50% / 50% 50% 50% 50%;
+      box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
+      animation: flowSyrup 2.2s linear infinite;
+    }
+
+    /* Смещения времени для непрерывного течения потоков */
+    .st1 { animation-delay: 0.0s; margin-top: -5px; width: 10px; height: 10px; }
+    .st2 { animation-delay: 0.4s; margin-top: 5px;  width: 7px;  height: 7px; }
+    .st3 { animation-delay: 0.8s; margin-top: -12px;width: 9px;  height: 9px; }
+    .st4 { animation-delay: 1.2s; margin-top: 10px; width: 6px;  height: 6px; }
+
+    .sy1 { animation-delay: 0.2s; margin-top: -6px; width: 20px; height: 12px; }
+    .sy2 { animation-delay: 0.8s; margin-top: 4px;  width: 14px; height: 9px; }
+    .sy3 { animation-delay: 1.4s; margin-top: -14px;width: 24px; height: 15px; }
+
+    @keyframes flowStarch {
+      0% { left: 94%; opacity: 0; transform: translate(0, -50%) scale(0.6); }
+      15% { opacity: 1; }
+      85% { opacity: 1; }
+      100% { left: 50%; opacity: 0.2; transform: translate(0, -50%) scale(1.1); }
+    }
+
+    @keyframes flowSyrup {
+      0% { left: 50%; opacity: 0; transform: translate(0, -50%) scale(0.8); }
+      15% { opacity: 1; transform: translate(0, -50%) scale(1.1); }
+      85% { opacity: 1; }
+      100% { left: 6%; opacity: 0; transform: translate(-20px, -50%) scale(0.5); }
+    }
+
+    @keyframes pulseCore {
+      0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
+      100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+    }
+
+    /* Растягиваем видеоокно камеры телефона */
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: 1;
+    }
+    #ar-container {
+      position: relative;
+      z-index: 2;
+    }
+  </style>
 </head>
-<body style="margin: 0; overflow: hidden; background: #000;">
+<body>
 
-  <!-- Быстрая AR-сцена. Сама включает камеру -->
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled: false;">
-    
-    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+  <div id="ar-info-panel">Наведите камеру на плакат</div>
 
-    <!-- 
-      Используем встроенный неубиваемый маркер HIRO. 
-      Он заменяет файл .mind, поэтому сайт загружается МГНОВЕННО.
-    -->
-    <a-marker preset="hiro">
-      
-      <!-- Разворачиваем потоки анимации горизонтально поверх вашего плаката -->
-      
-        
-        <!-- ================= ТОЧКА 5: ЦЕНТР (ЯДРО) ================= -->
-        <a-ring radius-inner="0" radius-outer="0.05" position="0 0 0.01" color="#ffd700"
-                animation="property: scale; from: 1 1 1; to: 1.3 1.3 1.3; dur: 800; loop: true; dir: alternate">
-        </a-ring>
+  <div id="ar-container">
+    <!-- Наш плакат-холст, который привяжется к реальному плакату в камере -->
+    <div id="paintar-target" class="ar-poster-canvas">
+      <div class="starch-particle st1"></div>
+      <div class="starch-particle st2"></div>
+      <div class="starch-particle st3"></div>
+      <div class="starch-particle st4"></div>
 
-        <!-- ================= ПОТОК КРАХМАЛА (Точка 8 → Точка 5) ================= -->
-        <!-- Белые сферы летят справа (X: 0.5) строго в центр (X: 0) -->
-        <a-sphere position="0.5 0 0.01" radius="0.015" color="#ffffff"
-                  animation="property: position; from: 0.5 0 0.01; to: 0 0 0.01; dur: 1800; loop: true; easing: linear">
-        </a-sphere>
-        <a-sphere position="0.5 0.03 0.01" radius="0.01" color="#f0f4f8"
-                  animation="property: position; from: 0.5 0.03 0.01; to: 0 0 0.01; dur: 1400; loop: true; easing: linear; delay: 400">
-        </a-sphere>
+      <div class="transformation-core"></div>
 
-        <!-- ================= ПОТОК СИРОПА (Точка 5 → Точка 2) ================= -->
-        <!-- Золотые капли летят из центра (X: 0) строго налево (X: -0.5) -->
-        <a-cylinder position="0 0 0.01" radius="0.015" height="0.06" color="#ffd700" rotation="0 0 90"
-                    animation="property: position; from: 0 0 0.01; to: -0.5 0 0.01; dur: 2200; loop: true; easing: linear">
-        </a-cylinder>
-        <a-cylinder position="0 -0.02 0.01" radius="0.012" height="0.05" color="#ffaa00" rotation="0 0 90"
-                    animation="property: position; from: 0 -0.02 0.01; to: -0.5 -0.02 0.01; dur: 1800; loop: true; easing: linear; delay: 500">
-        </a-cylinder>
+      <div class="syrup-drop sy1"></div>
+      <div class="syrup-drop sy2"></div>
+      <div class="syrup-drop sy3"></div>
+    </div>
+  </div>
 
-      
+  <script>
+    document.addEventListener("DOMContentLoaded", async () => {
+      const infoBox = document.getElementById('ar-info-panel');
+      const arCanvas = document.getElementById('paintar-target');
 
-    </a-marker>
+      try {
+        // Инициализация AR-движка и привязка к вашему маркеру картинок targets.mind
+        const mindarThree = new window.MINDAR.IMAGE.MindARImage({
+          container: document.querySelector("#ar-container"),
+          imageTargetSrc: "targets.mind" // Лежит в той же папке
+        });
 
-  </a-scene>
+        const anchor = mindarThree.addAnchor(0);
+
+        anchor.onTargetFound = () => {
+          infoBox.innerText = "АР Плакат Ожил ✨";
+          infoBox.style.borderColor = "#ffd700";
+          infoBox.style.color = "#ffd700";
+          arCanvas.classList.add("target-tracked");
+        };
+
+        anchor.onTargetReleased = () => {
+          infoBox.innerText = "Наведите камеру на плакат";
+          infoBox.style.borderColor = "#00f2fe";
+          infoBox.style.color = "#00f2fe";
+          arCanvas.classList.remove("target-tracked");
+        };
+
+        // Связываем CSS-координаты холста с физическими габаритами плаката в кадре камеры
+        anchor.onTargetUpdate = (matrix) => {
+          const projection = mindarThree.getProjectionMatrix();
+          const width = mindarThree.imageTargets.width;
+          const height = mindarThree.imageTargets.height;
+          
+          arCanvas.style.width = width + "px";
+          arCanvas.style.height = height + "px";
+          
+          // Метод MindAR автоматически трансформирует HTML-холст под наклоны и положение плаката
+          mindarThree.updateCSSObject(arCanvas, matrix, projection);
+        };
+
+        // Принудительный мгновенный запуск
+        await mindarThree.start();
+
+      } catch (err) {
+        console.error(err);
+        infoBox.innerText = "Ошибка запуска AR-камеры";
+      }
+    });
+  </script>
 
 </body>
 </html>
