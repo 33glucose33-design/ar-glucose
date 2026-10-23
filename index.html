@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AR Гидролиз: Крахмал и Сироп</title>
   
-  <!-- Подключаем только легкий CSS-трекер (без тяжелого 3D A-Frame движка) -->
+  <!-- Скрипт дополненной реальности -->
   <script src="https://jsdelivr.net"></script>
 
   <style>
@@ -16,39 +16,38 @@
       font-family: sans-serif;
     }
 
-    /* Информационное табло поверх камеры */
     #ar-info {
       position: fixed;
       top: 20px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(11, 12, 16, 0.8);
+      background: rgba(11, 12, 16, 0.85);
       border: 1px solid #45f3ff;
-      padding: 10px 20px;
+      padding: 12px 24px;
       border-radius: 20px;
       color: #45f3ff;
-      font-size: 12px;
+      font-size: 13px;
       text-transform: uppercase;
       letter-spacing: 2px;
       z-index: 999;
       text-align: center;
       pointer-events: none;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     }
 
-    /* Контейнер дополненной реальности (размеры подстроятся под ваш плакат в камере) */
+    /* Холст, который привяжется к плакату */
     .ar-poster-canvas {
       position: absolute;
-      display: none; /* Скрыт, пока камера не найдет плакат */
-      background: transparent; /* Полностью прозрачный фон, чтобы видеть реальный плакат */
+      display: none;
+      background: transparent;
       box-sizing: border-box;
     }
 
-    /* Активируется автоматически библиотекой MindAR, когда плакат в фокусе камеры */
     .ar-poster-canvas.target-tracked {
       display: block;
     }
 
-    /* ================= ЦЕНТРАЛЬНАЯ ТОЧКА 5 (ЯДРО РЕАКЦИИ) ================= */
+    /* Точка 5 (Ядро) */
     .transformation-core {
       position: absolute;
       top: 50%;
@@ -63,29 +62,26 @@
       z-index: 5;
     }
 
-    /* ================= ЛИНИИ ТРАЕКТОРИЙ В AR ================= */
-    .starch-particle, .syrup-drop {
+    /* Крахмал: 8 → 5 */
+    .starch-particle {
       position: absolute;
       top: 50%;
-    }
-
-    /* Крахмал: летит из Точки 8 (94%) в Точку 5 (50%) */
-    .starch-particle {
       background: #ffffff;
       border-radius: 50%;
       box-shadow: 0 0 10px #ffffff;
       animation: flowStarch 2s linear infinite;
     }
 
-    /* Сироп: летит из Точки 5 (50%) в Точку 2 (6%) */
+    /* Сироп: 5 → 2 */
     .syrup-drop {
+      position: absolute;
+      top: 50%;
       background: linear-gradient(to left, #ffd700, #ff8c00);
       border-radius: 50% 15% 15% 50% / 50% 50% 50% 50%;
       box-shadow: 0 0 15px rgba(255, 215, 0, 0.6);
       animation: flowSyrup 2.2s linear infinite;
     }
 
-    /* Непрерывность потока (задержки) */
     .st1 { animation-delay: 0.0s; margin-top: -5px; width: 10px; height: 10px; }
     .st2 { animation-delay: 0.4s; margin-top: 5px;  width: 7px;  height: 7px; }
     .st3 { animation-delay: 0.8s; margin-top: -12px;width: 9px;  height: 9px; }
@@ -95,7 +91,6 @@
     .sy2 { animation-delay: 0.8s; margin-top: 4px;  width: 14px; height: 9px; }
     .sy3 { animation-delay: 1.4s; margin-top: -14px;width: 24px; height: 15px; }
 
-    /* ================= АНИМАЦИИ ДВИЖЕНИЯ ПО КООРДИНАТАМ СЕТКИ ================= */
     @keyframes flowStarch {
       0% { left: 94%; opacity: 0; transform: translate(0, -50%) scale(0.6); }
       15% { opacity: 1; }
@@ -114,78 +109,85 @@
       0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.8; }
       100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
     }
+
+    /* Фикс видео для Хрома на Android */
+    video {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw !important;
+      height: 100vh !important;
+      object-fit: cover !important;
+      z-index: -1;
+    }
   </style>
 </head>
 <body>
 
-  <div id="ar-info">Поиск плаката... Наведите камеру</div>
+  <div id="ar-info">Запуск камеры... Подождите</div>
 
-  <!-- Контейнер MindAR для вывода изображения с камеры на задний план -->
   <div id="ar-container"></div>
 
-  <!-- Наш плакат-координат, который «прилипнет» к бумаге -->
   <div id="paintar-target" class="ar-poster-canvas">
-    
-    <!-- Поток Крахмала: 8 → 5 -->
     <div class="starch-particle st1"></div>
     <div class="starch-particle st2"></div>
     <div class="starch-particle st3"></div>
     <div class="starch-particle st4"></div>
 
-    <!-- Реактор гидролиза в Точке 5 -->
     <div class="transformation-core"></div>
 
-    <!-- Поток Сиропа: 5 → 2 -->
     <div class="syrup-drop sy1"></div>
     <div class="syrup-drop sy2"></div>
     <div class="syrup-drop sy3"></div>
-
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // Инициализируем AR-контроллер, передавая файл вашего скомпилированного плаката
-      const mindarThree = new window.MINDAR.IMAGE.MindARImage({
-        container: document.querySelector("#ar-container"),
-        imageTargetSrc: "targets.mind" // Файл должен лежать в той же папке на GitHub
-      });
-
-      const anchor = mindarThree.addAnchor(0);
-      const arCanvas = document.querySelector("#paintar-target");
+    document.addEventListener("DOMContentLoaded", async () => {
       const infoBox = document.querySelector("#ar-info");
+      const arCanvas = document.querySelector("#paintar-target");
 
-      // Когда плакат найден в камере
-      anchor.onTargetFound = () => {
-        infoBox.innerText = "АР Плакат Ожил ✨";
-        infoBox.style.borderColor = "#ffd700";
-        infoBox.style.color = "#ffd700";
-        arCanvas.classList.add("target-tracked");
-      };
+      try {
+        const mindarThree = new window.MINDAR.IMAGE.MindARImage({
+          container: document.querySelector("#ar-container"),
+          imageTargetSrc: "targets.mind"
+        });
 
-      // Если плакат ушел из поля зрения камеры
-      anchor.onTargetReleased = () => {
-        infoBox.innerText = "Поиск плаката... Наведите камеру";
-        infoBox.style.borderColor = "#45f3ff";
-        infoBox.style.color = "#45f3ff";
-        arCanvas.classList.remove("target-tracked");
-      };
+        const anchor = mindarThree.addAnchor(0);
 
-      // CSS-привязка координат плаката к координатам AR-трекера
-      anchor.onTargetUpdate = (matrix) => {
-        // Заставляем HTML-контейнер повторять размеры, углы наклона и положение плаката в пространстве
-        const projection = mindarThree.getProjectionMatrix();
-        const width = mindarThree.imageTargets[0].width;
-        const height = mindarThree.imageTargets[0].height;
-        
-        // Трансформируем CSS-координаты холста под движения телефона
-        arCanvas.style.width = width + "px";
-        arCanvas.style.height = height + "px";
-        // Магия позиционирования MindAR поверх реального объекта
-        mindarThree.updateCSSObject(arCanvas, matrix, projection);
-      };
+        anchor.onTargetFound = () => {
+          infoBox.innerText = "АР Плакат Ожил ✨";
+          infoBox.style.borderColor = "#ffd700";
+          infoBox.style.color = "#ffd700";
+          arCanvas.classList.add("target-tracked");
+        };
 
-      // Запуск камеры
-      mindarThree.start();
+        anchor.onTargetReleased = () => {
+          infoBox.innerText = "Наведите камеру на плакат";
+          infoBox.style.borderColor = "#45f3ff";
+          infoBox.style.color = "#45f3ff";
+          arCanvas.classList.remove("target-tracked");
+        };
+
+        anchor.onTargetUpdate = (matrix) => {
+          const projection = mindarThree.getProjectionMatrix();
+          const width = mindarThree.imageTargets.width;
+          const height = mindarThree.imageTargets.height;
+          
+          arCanvas.style.width = width + "px";
+          arCanvas.style.height = height + "px";
+          mindarThree.updateCSSObject(arCanvas, matrix, projection);
+        };
+
+        // Запуск AR
+        await mindarThree.start();
+        infoBox.innerText = "Наведите камеру на плакат";
+
+      } catch (err) {
+        console.error(err);
+        infoBox.innerText = "Ошибка доступа к камере";
+        infoBox.style.borderColor = "#ff4545";
+        infoBox.style.color = "#ff4545";
+      }
     });
   </script>
 
