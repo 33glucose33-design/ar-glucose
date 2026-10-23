@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AR Гидролиз: Крахмал и Сироп</title>
+  
+  <!-- Подключаем библиотеки AR (работают через CDN, без блокировок локально) -->
+  <script src="https://aframe.io"></script>
+  <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+
+  <!-- 
+    Инициализируем сцену камеры.
+    imageTargetSrc указывает на ваш скомпилированный файл targets.mind, 
+    который должен лежать в той же папке, что и этот HTML-файл.
+  -->
+  <a-scene mindar-image="imageTargetSrc: ./targets.mind;" 
+           color-space="sRGB" 
+           renderer="colorManagement: true, physicallyCorrectLights: true" 
+           vr-mode-ui="enabled: false" 
+           device-orientation-permission-ui="enabled: false">
+    
+    <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+    <!-- AR-Контейнер. Все, что внутри, прилипнет к плакату, когда камера его найдет -->
+    
+      
+      <!-- Слегка приподнимаем анимацию над бумагой (ось Z = 0.02), чтобы не мерцала текстура -->
+      
+        
+        <!-- ================= ПОТОК КРАХМАЛА (Из Точки 8 в Точку 5) ================= -->
+        <!-- Белые светящиеся сферы, летящие из X: 0.5 (право) в X: 0 (центр) -->
+        <a-sphere position="0.5 0 0" radius="0.02" color="#ffffff" 
+                  material="shader: flat; opacity: 0.8"
+                  animation="property: position; from: 0.5 0 0; to: 0 0 0; dur: 1800; loop: true; easing: linear">
+        </a-sphere>
+        
+        <a-sphere position="0.5 0.03 0" radius="0.015" color="#f0f4f8" 
+                  material="shader: flat; opacity: 0.6"
+                  animation="property: position; from: 0.5 0.03 0; to: 0 0 0; dur: 1400; loop: true; easing: linear; delay: 400">
+        </a-sphere>
+
+        <a-sphere position="0.5 -0.03 0" radius="0.017" color="#ffffff" 
+                  material="shader: flat; opacity: 0.7"
+                  animation="property: position; from: 0.5 -0.03 0; to: 0 0 0; dur: 2000; loop: true; easing: linear; delay: 800">
+        </a-sphere>
+
+
+        <!-- ================= ЦЕНТР: ТОЧКА 5 (Ядро трансформации) ================= -->
+        <a-light type="ambient" color="#fff"></a-light>
+        <a-ring radius-inner="0" radius-outer="0.04" color="#ffd700" material="shader: flat; opacity: 0.8"
+                animation="property: scale; from: 1 1 1; to: 1.3 1.3 1.3; dur: 800; loop: true; dir: alternate">
+        </a-ring>
+
+
+        <!-- ================= ПОТОК СИРОПА (Из Точки 5 в Точку 2) ================= -->
+        <!-- Золотые вытянутые капли (цилиндры), летящие из X: 0 (центр) в X: -0.5 (лево) -->
+        <a-cylinder position="0 0 0" radius="0.025" height="0.08" color="#ffd700" rotation="0 0 90"
+                    material="shader: flat; opacity: 0.9"
+                    animation="property: position; from: 0 0 0; to: -0.5 0 0; dur: 2200; loop: true; easing: linear">
+        </a-cylinder>
+
+        <a-cylinder position="0 0.02 0" radius="0.018" height="0.06" color="#ffaa00" rotation="0 0 90"
+                    material="shader: flat; opacity: 0.7"
+                    animation="property: position; from: 0 0.02 0; to: -0.5 0.02 0; dur: 1800; loop: true; easing: linear; delay: 500">
+        </a-cylinder>
+
+        <a-cylinder position="0 -0.02 0" radius="0.02" height="0.07" color="#fff5cc" rotation="0 0 90"
+                    material="shader: flat; opacity: 0.8"
+                    animation="property: position; from: 0 -0.02 0; to: -0.5 -0.02 0; dur: 2500; loop: true; easing: linear; delay: 1000">
+        </a-cylinder>
+
+      
+
+    
+  </a-scene>
+
+</body>
+</html>
